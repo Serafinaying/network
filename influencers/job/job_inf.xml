@@ -1,0 +1,141 @@
+//模块配置
+<mod>
+	//模块名称
+	<name>influence_calc</name>
+	//工作目录
+	<dir>/home/rank/wangdanying/influencers/work</dir>
+	//
+	<log_path>/home/rank/wangdanying/influencers/log</log_path>
+	//模块维护者，以接收报警邮件
+	<owner>wangdanying@weidian.com</owner>
+	//
+	<hdfs_dir>/user/rank/wangdanying/influencers</hdfs_dir>
+	<local_dir>/home/rank/wangdanying/influencers/data</local_dir>
+	//指定需要运行的任务
+	<task_run> in_out, sort_sum</task_run>
+	<description>计算节点个体影响力</description>
+</mod>
+
+<task>
+	<code>cover_calc</code>
+	<queue>rank</queue>
+	<mapper>sh -x work/cover_map.sh</mapper>
+	<reducer>sh -x work/cover_reduce.sh</reducer>
+	<key_num>1</key_num>
+	<sort_num>2</sort_num>
+	<input_files>hdfs:sid_friend_2month/part-*,user_behave_stat/20160824/part-*</input_files>
+	<output>cover_calc</output>
+	<description>计算用户的覆盖度，统计每个用户的活跃好友数</description>
+</task>
+
+<task>
+	<code>propagation_calc</code>
+	<queue>rank</queue>
+	<mapper>sh -x work/propagation_map.sh</mapper>
+	<reducer>sh -x work/propagation_reduce.sh</reducer>
+	<input_files>cover_calc/part-*</input_files>
+	<output>propagation_calc</output>
+	<description>计算用户的传播力，统计用户被点击的次数和人数</description>
+</task>
+
+<task>
+	<code>behave_stat</code>
+	<queue>rank</queue>
+	<mapper>sh -x work/behave_map.sh</mapper>
+	<reducer>sh -x work/behave_reduce.sh</reducer>
+	<input_files>/user/rank/wangdanying/user_h5/user_clean/2016-08-24/part-*</input_files>
+	<output>behave_calc</output>
+	<description>计算用户操作行为数</description>
+</task>
+
+<task>
+	<code>order_stat</code>
+	<queue>rank</queue>
+	<mapper>sh -x work/order_map.sh</mapper>
+	<reducer>sh -x work/order_reduce.sh</reducer>
+	<input_files>/user/rank/wangdanying/community_behave/order_info/part-*</input_files>
+	<output>order_stat</output>
+	<description>统计用户的成交订单以及成交用户数</description>
+</task>
+
+<task>
+	<code>order</code>
+	<queue>rank</queue>
+	<mapper>sh -x work/order.sh</mapper>
+	<reducer>cat</reducer>
+	<input_files>/user/rank/wangdanying/community_behave/order_info/part-*</input_files>
+	<output>order</output>
+	<description>列出用户的成交订单以及成交用户</description>
+</task>
+
+<task>
+	<code>stat</code>
+	<queue>rank</queue>
+	<mapper>sh -x work/stat.sh</mapper>
+	<reducer>sh -x work/stat_reduce.sh</reducer>
+	<input_files>propagation_calc, behave_calc, order_stat</input_files>
+	<output>stat</output>
+	<description>统计用户的成交订单以及成交用户数</description>
+</task>
+
+
+<task>
+	<code>feature_calc</code>
+	<mapper>sh -x work/feature.sh</mapper>
+	<reducer>sh -x work/feature_reduce.sh</reducer>
+	<input_files>stat</input_files>
+	<output>local:feature</output>
+	<description>加权计算用户的各项特征</description>
+</task>
+
+<task>
+	<code>feature_comm</code>
+	<mapper>sh -x work/comm_feature.sh</mapper>
+	<reducer>sh -x work/comm_feature_reduce.sh</reducer>
+	<key_num>1</key_num>
+	<sort_num>2</sort_num>
+	<input_files>/user/rank/wangdanying/community_behave/user_filter/part-*, feature</input_files>
+	<output>feature_comm</output>
+	<description>计算各用户的所属社区</description>
+</task>
+
+<task>
+	<code>sort_sum</code>
+	<mapper>sh -x work/sort_map.sh</mapper>
+	<reducer>sh -x work/sort_reduce.sh</reducer>
+	<input_files>in_out</input_files>
+	<output>local:comm_inf</output>
+	<description>社区影响力求和</description>
+</task>
+
+<task>
+	<code>in_comm</code>
+	<mapper>sh -x work/incomm_map.sh</mapper>
+	<reducer>sh -x work/incomm_reduce.sh</reducer>
+	<key_num>1</key_num>
+	<sort_num>2</sort_num>
+	<input_files>/user/rank/wangdanying/community_behave/user_filter/part-*, order, cover_calc</input_files>
+	<output>in_comm</output>
+	<description>统计用户在社区内外的行为</description>
+</task>
+
+<task>
+	<code>in_comm_stat</code>
+	<mapper>cat</mapper>
+	<reducer>sh -x work/incomm.sh</reducer>
+	<key_num>1</key_num>
+	<sort_num>2</sort_num>
+	<input_files>/user/rank/wangdanying/community_behave/user_filter/part-*, in_comm</input_files>
+	<output>in_comm_stat</output>
+	<description>统计用户在社区内外的行为2</description>
+</task>
+
+<task>
+	<code>in_out</code>
+	<mapper>cat</mapper>
+	<reducer>sh -x work/incomm_stat.sh</reducer>
+	<key_num>2</key_num>
+	<sort_num>3</sort_num>
+	<input_files>in_comm_stat</input_files>
+	<output>local:in_out</output>
+</task>	
